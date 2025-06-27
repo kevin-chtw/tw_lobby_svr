@@ -17,8 +17,7 @@ func main() {
 
 	logrus.SetLevel(logrus.DebugLevel)
 
-	config := config.NewDefaultPitayaConfig()
-	builder := pitaya.NewDefaultBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config)
+	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config.NewDefaultPitayaConfig())
 	app = builder.Build()
 
 	defer app.Shutdown()
@@ -29,7 +28,7 @@ func main() {
 }
 
 func initServices() {
-	accountSvc := service.NewAccountSvc(app)
-	app.Register(accountSvc, component.WithName("account"), component.WithNameFunc(strings.ToLower))
-	app.RegisterRemote(accountSvc, component.WithName("account"), component.WithNameFunc(strings.ToLower))
+	lobbySvc := service.NewLobbySvc(app)
+	app.Register(lobbySvc, component.WithName("lobby"), component.WithNameFunc(strings.ToLower))
+	app.RegisterRemote(lobbySvc, component.WithName("lobby"), component.WithNameFunc(strings.ToLower))
 }
