@@ -2,27 +2,27 @@ package service
 
 import (
 	"context"
-	"errors"
 
 	"github.com/kevin-chtw/tw_proto/cproto"
+	"github.com/kevin-chtw/tw_proto/sproto"
 	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/component"
 	e "github.com/topfreegames/pitaya/v3/pkg/errors"
 )
 
-type LobbySvc struct {
+type PlayerSvc struct {
 	component.Base
 	app pitaya.Pitaya
 }
 
-func NewLobbySvc(app pitaya.Pitaya) *LobbySvc {
-	return &LobbySvc{
+func NewPlayerSvc(app pitaya.Pitaya) *PlayerSvc {
+	return &PlayerSvc{
 		app: app,
 	}
 }
 
-func (l *LobbySvc) PlayerMsg(ctx context.Context, req *cproto.LobbyReq) (*cproto.CommonResponse, error) {
+func (l *PlayerSvc) Message(ctx context.Context, req *cproto.LobbyReq) (*cproto.CommonResponse, error) {
 	logrus.Debugf("PlayerMsg: %v", req)
 
 	if req.LoginReq != nil {
@@ -38,25 +38,20 @@ func (l *LobbySvc) PlayerMsg(ctx context.Context, req *cproto.LobbyReq) (*cproto
 	}, nil
 }
 
-func (l *LobbySvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error {
+func (l *PlayerSvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error {
 	s := l.app.GetSessionFromCtx(ctx)
 
-	// 验证账号密码
-	valid, userID, err := l.verifyAccount(ctx, req.Account, req.Password)
-	if err != nil {
-		logrus.Errorf("account verification failed: %v", err)
-		return pitaya.Error(err, e.ErrInternalCode)
-	}
-
-	if !valid {
-		return pitaya.Error(errors.New("invalid account or password"), e.ErrNotFoundCode, map[string]string{
-			"account": req.Account,
-		})
+	rsp := &sproto.GetPlayerAck{}
+	if err := l.app.RPC(ctx, "db.player.get", rsp, &sproto.GetPlayerReq{
+		Account:  req.Account,
+		Password: req.Password,
+	}); err != nil {
+		return err
 	}
 
 	// 绑定用户会话
-	if err := s.Bind(ctx, userID); err != nil {
-		logrus.Errorf("failed to bind session: %v", err)
+	if err := s.Bind(ctx, rsp.Userid); err != nil {
+		logrus.Errorf("failed to bind session: %v,uid:%v", err, rsp.Userid)
 		return pitaya.Error(err, e.ErrInternalCode)
 	}
 
@@ -64,29 +59,12 @@ func (l *LobbySvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error 
 	return s.Push("lobbymsg", &cproto.LobbyAck{
 		LoginAck: &cproto.LoginAck{
 			Serverid: l.app.GetServerID(),
-			Userid:   userID,
+			Userid:   rsp.Userid,
 		},
 	})
 }
 
-func (l *LobbySvc) verifyAccount(ctx context.Context, account, password string) (bool, string, error) {
-	// 调用数据库服务验证账号
-	rsp := &cproto.LobbyAck{}
-	err := l.app.RPC(ctx, "db.account.verify", rsp, &cproto.LobbyReq{
-		LoginReq: &cproto.LoginReq{
-			Account:  account,
-			Password: password,
-		},
-	})
-
-	if err != nil {
-		return false, "", err
-	}
-
-	return true, rsp.LoginAck.Userid, nil
-}
-
-func (l *LobbySvc) createAccount(ctx context.Context, account, password string) (string, error) {
+func (l *PlayerSvc) createAccount(ctx context.Context, account, password string) (string, error) {
 	// 调用数据库服务创建账号
 	rsp := &cproto.LobbyAck{}
 	err := l.app.RPC(ctx, "db.account.create", rsp, &cproto.LobbyReq{
@@ -103,7 +81,7 @@ func (l *LobbySvc) createAccount(ctx context.Context, account, password string) 
 	return rsp.RegisterAck.Userid, nil
 }
 
-func (l *LobbySvc) handleRegister(ctx context.Context, req *cproto.RegisterReq) error {
+func (l *PlayerSvc) handleRegister(ctx context.Context, req *cproto.RegisterReq) error {
 	s := l.app.GetSessionFromCtx(ctx)
 
 	// 创建新账号

@@ -16,6 +16,7 @@ func main() {
 	serverType := "lobby"
 
 	logrus.SetLevel(logrus.DebugLevel)
+	logrus.SetReportCaller(true)
 
 	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config.NewDefaultPitayaConfig())
 	app = builder.Build()
@@ -28,7 +29,7 @@ func main() {
 }
 
 func initServices() {
-	lobbySvc := service.NewLobbySvc(app)
-	app.Register(lobbySvc, component.WithName("lobby"), component.WithNameFunc(strings.ToLower))
-	app.RegisterRemote(lobbySvc, component.WithName("lobby"), component.WithNameFunc(strings.ToLower))
+	playerSvc := service.NewPlayerSvc(app)
+	app.Register(playerSvc, component.WithName("player"), component.WithNameFunc(strings.ToLower))
+	app.RegisterRemote(playerSvc, component.WithName("player"), component.WithNameFunc(strings.ToLower))
 }
