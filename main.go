@@ -8,6 +8,7 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/component"
 	"github.com/topfreegames/pitaya/v3/pkg/config"
+	"github.com/topfreegames/pitaya/v3/pkg/session"
 )
 
 var app pitaya.Pitaya
@@ -24,12 +25,12 @@ func main() {
 	defer app.Shutdown()
 
 	logrus.Infof("Pitaya server of type %s started", serverType)
-	initServices()
+	initServices(builder.SessionPool)
 	app.Start()
 }
 
-func initServices() {
-	playerSvc := service.NewPlayerSvc(app)
+func initServices(sessionPool session.SessionPool) {
+	playerSvc := service.NewPlayerSvc(app, sessionPool)
 	app.Register(playerSvc, component.WithName("player"), component.WithNameFunc(strings.ToLower))
 	app.RegisterRemote(playerSvc, component.WithName("player"), component.WithNameFunc(strings.ToLower))
 }

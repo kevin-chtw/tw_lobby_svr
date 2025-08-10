@@ -9,16 +9,19 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/component"
 	e "github.com/topfreegames/pitaya/v3/pkg/errors"
+	"github.com/topfreegames/pitaya/v3/pkg/session"
 )
 
 type PlayerSvc struct {
 	component.Base
-	app pitaya.Pitaya
+	app         pitaya.Pitaya
+	sessionPool session.SessionPool
 }
 
-func NewPlayerSvc(app pitaya.Pitaya) *PlayerSvc {
+func NewPlayerSvc(app pitaya.Pitaya, sessionPool session.SessionPool) *PlayerSvc {
 	return &PlayerSvc{
-		app: app,
+		app:         app,
+		sessionPool: sessionPool,
 	}
 }
 
@@ -49,6 +52,11 @@ func (l *PlayerSvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error
 		return err
 	}
 
+	if old := l.sessionPool.GetSessionByUID(rsp.Userid); old != nil {
+		// 踢掉旧玩家
+		old.Kick(context.Background())
+	}
+
 	// 绑定用户会话
 	if err := s.Bind(ctx, rsp.Userid); err != nil {
 		logrus.Errorf("failed to bind session: %v,uid:%v", err, rsp.Userid)
@@ -67,7 +75,7 @@ func (l *PlayerSvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error
 func (l *PlayerSvc) createAccount(ctx context.Context, account, password string) (string, error) {
 	// 调用数据库服务创建账号
 	rsp := &cproto.LobbyAck{}
-	err := l.app.RPC(ctx, "db.account.create", rsp, &cproto.LobbyReq{
+	err := l.app.RPC(ctx, "db.player.create", rsp, &cproto.LobbyReq{
 		RegisterReq: &cproto.RegisterReq{
 			Account:  account,
 			Password: password,
@@ -104,4 +112,18 @@ func (l *PlayerSvc) handleRegister(ctx context.Context, req *cproto.RegisterReq)
 			Userid:   userID,
 		},
 	})
+}
+
+// PlayerOffline 处理玩家离线通知
+func (l *PlayerSvc) PlayerOffline(ctx context.Context, msg *map[string]interface{}) (*cproto.CommonResponse, error) {
+	if uid, ok := (*msg)["uid"].(string); ok {
+		logrus.Infof("Player offline: %s", uid)
+		// 这里可以添加玩家离线后的处理逻辑，比如清理数据、通知其他服务等
+	} else {
+		logrus.Warn("Received invalid player offline message")
+	}
+
+	return &cproto.CommonResponse{
+		Err: 0,
+	}, nil
 }
