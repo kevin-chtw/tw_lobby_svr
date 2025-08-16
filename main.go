@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 
+	"github.com/kevin-chtw/tw_common/utils"
 	"github.com/kevin-chtw/tw_lobby_svr/service"
 	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
@@ -15,9 +16,7 @@ var app pitaya.Pitaya
 
 func main() {
 	serverType := "lobby"
-
-	logrus.SetLevel(logrus.DebugLevel)
-	logrus.SetReportCaller(true)
+	pitaya.SetLogger(utils.Logger(logrus.InfoLevel))
 
 	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config.NewDefaultPitayaConfig())
 	app = builder.Build()
