@@ -25,7 +25,7 @@ func NewPlayerSvc(app pitaya.Pitaya, sessionPool session.SessionPool) *PlayerSvc
 	}
 }
 
-func (l *PlayerSvc) Message(ctx context.Context, req *cproto.LobbyReq) (*cproto.CommonResponse, error) {
+func (l *PlayerSvc) Message(ctx context.Context, req *cproto.LobbyReq) (*cproto.LobbyAck, error) {
 	logrus.Debugf("PlayerMsg: %v", req)
 
 	if req.LoginReq != nil {
@@ -36,9 +36,7 @@ func (l *PlayerSvc) Message(ctx context.Context, req *cproto.LobbyReq) (*cproto.
 		return nil, l.handleRegister(ctx, req.RegisterReq)
 	}
 
-	return &cproto.CommonResponse{
-		Err: 0,
-	}, nil
+	return &cproto.LobbyAck{}, nil
 }
 
 func (l *PlayerSvc) handleLogin(ctx context.Context, req *cproto.LoginReq) error {
@@ -115,7 +113,7 @@ func (l *PlayerSvc) handleRegister(ctx context.Context, req *cproto.RegisterReq)
 }
 
 // PlayerOffline 处理玩家离线通知
-func (l *PlayerSvc) PlayerOffline(ctx context.Context, msg *map[string]interface{}) (*cproto.CommonResponse, error) {
+func (l *PlayerSvc) PlayerOffline(ctx context.Context, msg *map[string]interface{}) (*cproto.LobbyAck, error) {
 	if uid, ok := (*msg)["uid"].(string); ok {
 		logrus.Infof("Player offline: %s", uid)
 		// 这里可以添加玩家离线后的处理逻辑，比如清理数据、通知其他服务等
@@ -123,7 +121,5 @@ func (l *PlayerSvc) PlayerOffline(ctx context.Context, msg *map[string]interface
 		logrus.Warn("Received invalid player offline message")
 	}
 
-	return &cproto.CommonResponse{
-		Err: 0,
-	}, nil
+	return &cproto.LobbyAck{}, nil
 }
