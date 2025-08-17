@@ -103,15 +103,3 @@ func (l *Player) handleRegister(ctx context.Context, req *cproto.RegisterReq) (*
 		},
 	}, nil
 }
-
-// PlayerOffline 处理玩家离线通知
-func (l *Player) PlayerOffline(ctx context.Context, msg *map[string]interface{}) (*cproto.LobbyAck, error) {
-	if uid, ok := (*msg)["uid"].(string); ok {
-		logrus.Infof("Player offline: %s", uid)
-		// 这里可以添加玩家离线后的处理逻辑，比如清理数据、通知其他服务等
-	} else {
-		logrus.Warn("Received invalid player offline message")
-	}
-
-	return &cproto.LobbyAck{}, nil
-}
