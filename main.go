@@ -10,6 +10,7 @@ import (
 	"github.com/topfreegames/pitaya/v3/pkg/component"
 	"github.com/topfreegames/pitaya/v3/pkg/config"
 	"github.com/topfreegames/pitaya/v3/pkg/logger"
+	"github.com/topfreegames/pitaya/v3/pkg/serialize"
 	"github.com/topfreegames/pitaya/v3/pkg/session"
 )
 
@@ -19,7 +20,9 @@ func main() {
 	serverType := "lobby"
 	pitaya.SetLogger(utils.Logger(logrus.DebugLevel))
 
-	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config.NewDefaultPitayaConfig())
+	config := config.NewDefaultPitayaConfig()
+	config.SerializerType = uint16(serialize.PROTOBUF)
+	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config)
 	app = builder.Build()
 
 	defer app.Shutdown()
