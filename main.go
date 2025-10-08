@@ -22,6 +22,7 @@ func main() {
 
 	config := config.NewDefaultPitayaConfig()
 	config.SerializerType = uint16(serialize.PROTOBUF)
+	config.Handler.Messages.Compression = false
 	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config)
 	app = builder.Build()
 
