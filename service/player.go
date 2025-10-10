@@ -2,12 +2,13 @@ package service
 
 import (
 	"context"
+	"runtime/debug"
 
 	"github.com/kevin-chtw/tw_proto/cproto"
 	"github.com/kevin-chtw/tw_proto/sproto"
-	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/component"
+	"github.com/topfreegames/pitaya/v3/pkg/logger"
 	"github.com/topfreegames/pitaya/v3/pkg/session"
 )
 
@@ -25,7 +26,12 @@ func NewPlayer(app pitaya.Pitaya, sessionPool session.SessionPool) *Player {
 }
 
 func (l *Player) Message(ctx context.Context, req *cproto.LobbyReq) (*cproto.LobbyAck, error) {
-	logrus.Debugf("PlayerMsg: %v", req)
+	defer func() {
+		if r := recover(); r != nil {
+			logger.Log.Errorf("panic recovered %s\n %s", r, string(debug.Stack()))
+		}
+	}()
+	logger.Log.Infof("PlayerMsg: %v", req)
 
 	if req.LoginReq != nil {
 		return l.handleLogin(ctx, req.LoginReq)
