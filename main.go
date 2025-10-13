@@ -1,22 +1,19 @@
 package main
 
 import (
-	"strings"
-
 	"github.com/kevin-chtw/tw_common/utils"
-	"github.com/kevin-chtw/tw_lobby_svr/service"
 	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
-	"github.com/topfreegames/pitaya/v3/pkg/component"
 	"github.com/topfreegames/pitaya/v3/pkg/config"
 	"github.com/topfreegames/pitaya/v3/pkg/logger"
 	"github.com/topfreegames/pitaya/v3/pkg/serialize"
-	"github.com/topfreegames/pitaya/v3/pkg/session"
 )
 
 var app pitaya.Pitaya
 
 func main() {
+	// queue.SendCommonMsgQueue("Dau", []string{"test 10000"})
+	// queue.SendCommonMsgQueue("充值", []string{"充值总额10000,充值次数5000"})
 	serverType := "lobby"
 	pitaya.SetLogger(utils.Logger(logrus.DebugLevel))
 
@@ -29,12 +26,5 @@ func main() {
 	defer app.Shutdown()
 
 	logger.Log.Infof("Pitaya server of type %s started", serverType)
-	initServices(builder.SessionPool)
 	app.Start()
-}
-
-func initServices(sessionPool session.SessionPool) {
-	player := service.NewPlayer(app, sessionPool)
-	app.Register(player, component.WithName("player"), component.WithNameFunc(strings.ToLower))
-	app.RegisterRemote(player, component.WithName("player"), component.WithNameFunc(strings.ToLower))
 }
