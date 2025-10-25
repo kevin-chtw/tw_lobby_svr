@@ -14,7 +14,7 @@ var app pitaya.Pitaya
 func main() {
 	// queue.SendCommonMsgQueue("Dau", []string{"test 10000"})
 	// queue.SendCommonMsgQueue("充值", []string{"充值总额10000,充值次数5000"})
-	serverType := "lobby"
+	serverType := "island"
 	pitaya.SetLogger(utils.Logger(logrus.DebugLevel))
 
 	config := config.NewDefaultPitayaConfig()

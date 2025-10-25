@@ -1,0 +1,37 @@
+package match
+
+import (
+	"github.com/kevin-chtw/tw_common/matchbase"
+	"github.com/kevin-chtw/tw_proto/sproto"
+)
+
+type Table struct {
+	*matchbase.Table
+	players map[string]*matchbase.Player
+}
+
+func NewTable(m *Match) *Table {
+	return &Table{
+		Table:   matchbase.NewTable(m.Match),
+		players: make(map[string]*matchbase.Player),
+	}
+}
+
+func (t *Table) handleStart() {
+	t.SendAddTableReq(t.Match.Conf.ScoreBase, 1, t.Match.Conf.GameType, nil)
+	seat := int32(0)
+	for _, p := range t.players {
+		t.SendAddPlayer(p, seat)
+		t.SendStartClient(p)
+		seat++
+	}
+}
+
+func (t *Table) gameResult(msg *sproto.GameResultAck) error {
+	for _, p := range msg.Players {
+		if player, ok := t.players[p.Playerid]; ok {
+			player.Score = p.Score
+		}
+	}
+	return nil
+}

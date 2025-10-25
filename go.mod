@@ -1,13 +1,14 @@
-module github.com/kevin-chtw/tw_lobby_svr
+module github.com/kevin-chtw/tw_island_svr
 
 go 1.24.4
 
 require (
-	github.com/duke-git/lancet/v2 v2.3.7
-	github.com/go-resty/resty/v2 v2.16.5
 	github.com/kevin-chtw/tw_common v0.0.0-00010101000000-000000000000
+	github.com/kevin-chtw/tw_proto v0.0.0-20250817090421-de16e4c22163
 	github.com/sirupsen/logrus v1.9.3
 	github.com/topfreegames/pitaya/v3 v3.0.0-beta.6
+	google.golang.org/protobuf v1.36.7
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 replace github.com/kevin-chtw/tw_proto => ../tw_proto
@@ -23,12 +24,14 @@ require (
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-semver v0.3.1 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
+	github.com/duke-git/lancet/v2 v2.3.7 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-playground/locales v0.14.1 // indirect
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.13.0 // indirect
+	github.com/go-resty/resty/v2 v2.16.5 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/golang/protobuf v1.5.4 // indirect
 	github.com/gomodule/redigo v1.9.2 // indirect
@@ -83,7 +86,5 @@ require (
 	google.golang.org/genproto/googleapis/api v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240701130421-f6361c86f094 // indirect
 	google.golang.org/grpc v1.64.0 // indirect
-	google.golang.org/protobuf v1.36.7 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
