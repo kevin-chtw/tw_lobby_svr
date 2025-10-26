@@ -1,9 +1,13 @@
 package main
 
 import (
+	"strings"
+
 	"github.com/kevin-chtw/tw_common/utils"
+	"github.com/kevin-chtw/tw_island_svr/service"
 	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
+	"github.com/topfreegames/pitaya/v3/pkg/component"
 	"github.com/topfreegames/pitaya/v3/pkg/config"
 	"github.com/topfreegames/pitaya/v3/pkg/logger"
 	"github.com/topfreegames/pitaya/v3/pkg/serialize"
@@ -24,7 +28,15 @@ func main() {
 	app = builder.Build()
 
 	defer app.Shutdown()
-
+	initServices()
 	logger.Log.Infof("Pitaya server of type %s started", serverType)
 	app.Start()
+}
+
+func initServices() {
+	player := service.NewPlayer(app)
+	app.Register(player, component.WithName("player"), component.WithNameFunc(strings.ToLower))
+
+	remote := service.NewRemote(app)
+	app.RegisterRemote(remote, component.WithName("remote"), component.WithNameFunc(strings.ToLower))
 }

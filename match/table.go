@@ -27,11 +27,27 @@ func (t *Table) handleStart() {
 	}
 }
 
-func (t *Table) gameResult(msg *sproto.GameResultAck) error {
+func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 	for _, p := range msg.Players {
 		if player, ok := t.players[p.Playerid]; ok {
 			player.Score = p.Score
 		}
 	}
 	return nil
+}
+
+func (t *Table) netChange(player *matchbase.Player, online bool) error {
+	t.SendNetState(player, online)
+	if online {
+		t.SendStartClient(player)
+	}
+	return nil
+}
+
+func (t *Table) ExitTable(player *matchbase.Player) bool {
+	ack := t.SendExitTableReq(player)
+	if ack == nil || ack.Result != 0 {
+		return false
+	}
+	return true
 }
