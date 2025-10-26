@@ -8,7 +8,7 @@ import (
 )
 
 type Config struct {
-	*matchbase.Config
+	*matchbase.Config `yaml:"setting"`
 }
 
 func LoadConfig(path string) (*Config, error) {
@@ -17,10 +17,12 @@ func LoadConfig(path string) (*Config, error) {
 		return nil, err
 	}
 
-	var config Config
+	config := &Config{
+		Config: &matchbase.Config{},
+	}
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, err
 	}
 
-	return &config, nil
+	return config, nil
 }

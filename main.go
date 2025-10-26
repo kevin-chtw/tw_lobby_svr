@@ -3,7 +3,9 @@ package main
 import (
 	"strings"
 
+	"github.com/kevin-chtw/tw_common/storage"
 	"github.com/kevin-chtw/tw_common/utils"
+	"github.com/kevin-chtw/tw_island_svr/match"
 	"github.com/kevin-chtw/tw_island_svr/service"
 	"github.com/sirupsen/logrus"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
@@ -16,8 +18,6 @@ import (
 var app pitaya.Pitaya
 
 func main() {
-	// queue.SendCommonMsgQueue("Dau", []string{"test 10000"})
-	// queue.SendCommonMsgQueue("充值", []string{"充值总额10000,充值次数5000"})
 	serverType := "island"
 	pitaya.SetLogger(utils.Logger(logrus.DebugLevel))
 
@@ -26,8 +26,11 @@ func main() {
 	config.Handler.Messages.Compression = false
 	builder := pitaya.NewBuilder(false, serverType, pitaya.Cluster, map[string]string{}, *config)
 	app = builder.Build()
-
 	defer app.Shutdown()
+
+	bs := storage.NewETCDMatching(builder.Server, builder.Config.Modules.BindingStorage.Etcd)
+	app.RegisterModule(bs, "matchingstorage")
+	match.Init(app)
 	initServices()
 	logger.Log.Infof("Pitaya server of type %s started", serverType)
 	app.Start()

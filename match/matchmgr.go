@@ -45,7 +45,7 @@ func (m *Matchmgr) LoadMatchs() error {
 	// 加载每个配置文件
 	for _, file := range files {
 		config, err := LoadConfig(file)
-		if err != nil {
+		if err != nil || config == nil {
 			logger.Log.Error(err.Error())
 			continue
 		}

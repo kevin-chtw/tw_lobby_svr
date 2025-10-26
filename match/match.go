@@ -58,7 +58,7 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 
 func (m *Match) addPlayer(player *matchbase.Player) {
 	m.preTable.players[player.ID] = player
-	if len(m.preTable.players) > int(m.conf.PlayerPerTable) {
+	if len(m.preTable.players) >= int(m.conf.PlayerPerTable) {
 		go m.preTable.handleStart()
 		m.tables.Store(m.preTable.ID, m.preTable)
 		player.Sub.(*Player).setMatchState(MatchStatePlaying)
