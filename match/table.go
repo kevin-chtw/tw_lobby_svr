@@ -23,6 +23,7 @@ func (t *Table) handleStart() {
 	for _, p := range t.players {
 		t.SendAddPlayer(p, seat)
 		t.SendStartClient(p)
+		p.Sub.(*Player).setMatchState(MatchStatePlaying)
 		seat++
 	}
 }

@@ -61,7 +61,6 @@ func (m *Match) addPlayer(player *matchbase.Player) {
 	if len(m.preTable.players) >= int(m.conf.PlayerPerTable) {
 		go m.preTable.handleStart()
 		m.tables.Store(m.preTable.ID, m.preTable)
-		player.Sub.(*Player).setMatchState(MatchStatePlaying)
 		m.preTable = NewTable(m)
 	}
 }
@@ -112,9 +111,7 @@ func (m *Match) HandleExistMatch(ctx context.Context, msg proto.Message) (proto.
 func (m *Match) HandleNetState(msg proto.Message) error {
 	req := msg.(*sproto.NetStateReq)
 	player := m.Playermgr.Load(req.Uid)
-	if !player.SetState(req.Online) {
-		return nil
-	}
+	player.Online = req.Online
 
 	p := player.Sub.(*Player)
 	switch p.matchState {
@@ -195,7 +192,7 @@ func (m *Match) existMatch(p *matchbase.Player) {
 	if err = ms.Remove(p.ID); err != nil {
 		logger.Log.Errorf("Failed to remove player from etcd: %v", err)
 	}
-	p.State = 2
+	p.Exit = true
 	matchState := p.Sub.(*Player).matchState
 
 	if matchState == MatchStateResting {
