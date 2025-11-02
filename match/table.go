@@ -29,10 +29,8 @@ func (t *Table) handleStart() {
 }
 
 func (t *Table) gameResult(msg *sproto.GameResultReq) error {
-	for _, p := range msg.Players {
-		if player, ok := t.players[p.Playerid]; ok {
-			player.Score = p.Score
-		}
+	for p, s := range msg.Scores {
+		t.players[p].Score = s
 	}
 	return nil
 }
