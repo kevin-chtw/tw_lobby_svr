@@ -13,9 +13,9 @@ type Player struct {
 	playing   bool
 }
 
-func NewPlayer(ctx context.Context, id string, matchId, tableId int32, score int64) *Player {
+func NewPlayer(ctx context.Context, id string, matchId int32, score int64) *Player {
 	p := &Player{startTime: time.Now(), playing: true}
-	p.Player = matchbase.NewPlayer(p, ctx, id, matchId, tableId, score)
+	p.Player = matchbase.NewPlayer(p, ctx, id, matchId, score)
 	return p
 }
 

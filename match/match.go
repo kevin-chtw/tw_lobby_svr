@@ -26,7 +26,6 @@ type Match struct {
 func NewMatch(app pitaya.Pitaya, conf *Config) *Match {
 	m := &Match{conf: conf, restPlayers: make(map[string]*Player)}
 	m.Match = matchbase.NewMatch(app, conf.Config, m)
-	m.preTable = NewTable(m)
 	return m
 }
 
@@ -40,7 +39,7 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 		return nil, errors.New("player is in match")
 	}
 
-	player := NewPlayer(ctx, uid, m.conf.Matchid, m.preTable.ID, m.conf.InitialChips)
+	player := NewPlayer(ctx, uid, m.conf.Matchid, m.conf.InitialChips)
 	if err := m.addPlayer(player); err != nil {
 		return nil, err
 	}
@@ -50,12 +49,15 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 }
 
 func (m *Match) addPlayer(player *Player) error {
+	if m.preTable == nil {
+		m.preTable = NewTable(m)
+		m.tables.Store(m.preTable.ID, m.preTable)
+	}
 	if err := m.preTable.AddPlayer(player.Player); err != nil {
 		return err
 	}
 	if len(m.preTable.Players) >= int(m.conf.PlayerPerTable) {
-		m.tables.Store(m.preTable.ID, m.preTable)
-		m.preTable = NewTable(m)
+		m.preTable = nil
 	}
 	return nil
 }
@@ -76,7 +78,7 @@ func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Me
 
 	delete(m.restPlayers, uid)
 	m.addPlayer(player)
-	return &cproto.ContinueAck{}, nil
+	return m.NewStartClientAck(player.Player), nil
 }
 
 func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.Message, error) {
@@ -84,8 +86,8 @@ func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.M
 	if uid == "" {
 		return nil, errors.New("no logged in")
 	}
-	player, ok := m.preTable.Players[uid]
-	if !ok {
+	player := m.Playermgr.Load(uid)
+	if player == nil {
 		return nil, errors.New("player is not in match")
 	}
 
