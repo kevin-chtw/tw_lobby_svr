@@ -29,8 +29,8 @@ func NewPlayer(app pitaya.Pitaya) *Player {
 
 func (p *Player) Init() {
 	p.handlers[utils.TypeUrl(&cproto.SignupReq{})] = (*match.Match).HandleSignup
-	p.handlers[utils.TypeUrl(&cproto.SignoutReq{})] = (*match.Match).HandleSignout
 	p.handlers[utils.TypeUrl(&cproto.ContinueReq{})] = (*match.Match).HandleContinue
+	p.handlers[utils.TypeUrl(&cproto.ExitMatchReq{})] = (*match.Match).HandleExitMatch
 }
 
 func (p *Player) Message(ctx context.Context, data []byte) ([]byte, error) {

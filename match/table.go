@@ -7,30 +7,19 @@ import (
 
 type Table struct {
 	*matchbase.Table
-	players map[string]*matchbase.Player
 }
 
 func NewTable(m *Match) *Table {
-	return &Table{
-		Table:   matchbase.NewTable(m.Match),
-		players: make(map[string]*matchbase.Player),
+	t := &Table{
+		Table: matchbase.NewTable(m.Match),
 	}
-}
-
-func (t *Table) handleStart() {
-	t.SendAddTableReq(t.Match.Conf.ScoreBase, 1, t.Match.Conf.GameType, nil)
-	seat := int32(0)
-	for _, p := range t.players {
-		t.SendAddPlayer(p, seat)
-		t.SendStartClient(p)
-		p.Sub.(*Player).setMatchState(MatchStatePlaying)
-		seat++
-	}
+	t.SendAddTableReq(1, nil)
+	return t
 }
 
 func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 	for p, s := range msg.Scores {
-		t.players[p].Score = s
+		t.Players[p].Score = s
 	}
 	return nil
 }
@@ -44,6 +33,7 @@ func (t *Table) netChange(player *matchbase.Player, online bool) error {
 }
 
 func (t *Table) ExitTable(player *matchbase.Player) bool {
+	delete(t.Players, player.ID)
 	ack := t.SendExitTableReq(player)
 	if ack == nil || ack.Result != 0 {
 		return false
