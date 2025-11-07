@@ -107,7 +107,7 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 		if !ok {
 			return errors.New("table not found")
 		}
-		return t.(*Table).netChange(player, req.Online)
+		return t.(*Table).NetChange(player, req.Online)
 	} else {
 		m.sendRestAck(player)
 	}

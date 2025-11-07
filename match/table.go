@@ -24,18 +24,9 @@ func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 	return nil
 }
 
-func (t *Table) netChange(player *matchbase.Player, online bool) error {
-	t.SendNetState(player, online)
-	if online {
-		t.SendStartClient(player)
-	}
-	return nil
-}
-
 func (t *Table) ExitTable(player *matchbase.Player) bool {
 	delete(t.Players, player.ID)
-	ack := t.SendExitTableReq(player)
-	if ack == nil || ack.Result != 0 {
+	if err := t.SendExitTableReq(player); err != nil {
 		return false
 	}
 	return true
