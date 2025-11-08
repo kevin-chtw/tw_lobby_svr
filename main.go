@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 
+	"github.com/kevin-chtw/tw_common/matchbase"
 	"github.com/kevin-chtw/tw_common/storage"
 	"github.com/kevin-chtw/tw_common/utils"
 	"github.com/kevin-chtw/tw_island_svr/match"
@@ -30,7 +31,7 @@ func main() {
 
 	bs := storage.NewETCDMatching(builder.Server, builder.Config.Modules.BindingStorage.Etcd)
 	app.RegisterModule(bs, "matchingstorage")
-	match.Init(app)
+	matchbase.Init(app, match.NewMatch, match.NewTable, match.NewPlayer)
 	initServices()
 	logger.Log.Infof("Pitaya server of type %s started", serverType)
 	app.Start()

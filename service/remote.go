@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kevin-chtw/tw_common/matchbase"
 	"github.com/kevin-chtw/tw_common/utils"
 	"github.com/kevin-chtw/tw_island_svr/match"
 	"github.com/kevin-chtw/tw_proto/sproto"
@@ -40,18 +41,18 @@ func (g *Game) Message(ctx context.Context, msg *sproto.MatchReq) (*sproto.Match
 
 	logger.Log.Info(msg.String(), msg.Req.TypeUrl)
 
-	match := match.GetMatch(msg.Matchid)
-	if match == nil {
-		return nil, fmt.Errorf("match not found for ID %d", msg.Matchid)
-	}
-
 	req, err := msg.Req.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
+	base := matchbase.GetMatch(msg.Matchid)
+	if base == nil {
+		return nil, fmt.Errorf("match not found for ID %d", msg.Matchid)
+	}
+	m := base.Sub.(*match.Match)
 	if handler, ok := g.handlers[msg.Req.TypeUrl]; ok {
-		if err := handler(match, req); err != nil {
+		if err := handler(m, req); err != nil {
 			return nil, err
 		} else {
 			return &sproto.MatchAck{}, nil

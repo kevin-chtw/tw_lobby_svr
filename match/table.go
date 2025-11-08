@@ -9,12 +9,11 @@ type Table struct {
 	*matchbase.Table
 }
 
-func NewTable(m *Match) *Table {
-	t := &Table{
-		Table: matchbase.NewTable(m.Match),
-	}
+func NewTable(m *matchbase.Match) *matchbase.Table {
+	t := &Table{}
+	t.Table = matchbase.NewTable(m, t)
 	t.SendAddTableReq(1, nil)
-	return t
+	return t.Table
 }
 
 func (t *Table) gameResult(msg *sproto.GameResultReq) error {

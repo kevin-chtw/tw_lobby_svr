@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/kevin-chtw/tw_common/matchbase"
 	"github.com/kevin-chtw/tw_common/utils"
 	"github.com/kevin-chtw/tw_island_svr/match"
 	"github.com/kevin-chtw/tw_proto/cproto"
@@ -38,23 +39,22 @@ func (p *Player) Message(ctx context.Context, data []byte) ([]byte, error) {
 	if err := utils.Unmarshal(ctx, data, req); err != nil {
 		return nil, err
 	}
-
-	logger.Log.Info(req.String(), req.Req.TypeUrl)
-
-	match := match.GetMatch(req.Matchid)
-	if match == nil {
-		return nil, fmt.Errorf("match not found for ID %d", req.Matchid)
-	}
 	msg, err := req.Req.UnmarshalNew()
 	if err != nil {
 		return nil, err
 	}
 
+	logger.Log.Info(msg)
+	base := matchbase.GetMatch(req.Matchid)
+	if base == nil {
+		return nil, fmt.Errorf("match not found for ID %d", req.Matchid)
+	}
+	m := base.Sub.(*match.Match)
 	if handler, ok := p.handlers[req.Req.TypeUrl]; ok {
-		if rsp, err := handler(match, ctx, msg); err != nil {
+		if rsp, err := handler(m, ctx, msg); err != nil {
 			return nil, err
 		} else {
-			return match.NewMatchAck(ctx, rsp)
+			return base.NewMatchAck(ctx, rsp)
 		}
 	}
 	return nil, errors.ErrUnsupported

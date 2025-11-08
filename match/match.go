@@ -3,7 +3,6 @@ package match
 import (
 	"context"
 	"errors"
-	"sync"
 	"time"
 
 	"github.com/kevin-chtw/tw_common/matchbase"
@@ -17,57 +16,60 @@ import (
 
 type Match struct {
 	*matchbase.Match
-	conf        *Config
-	preTable    *Table
-	tables      sync.Map
-	restPlayers map[string]*Player
+	preTable    *matchbase.Table
+	restPlayers map[string]*matchbase.Player
 }
 
-func NewMatch(app pitaya.Pitaya, conf *Config) *Match {
-	m := &Match{conf: conf, restPlayers: make(map[string]*Player)}
-	m.Match = matchbase.NewMatch(app, conf.Config, m)
-	return m
+func NewMatch(app pitaya.Pitaya, file string) *matchbase.Match {
+	m := &Match{restPlayers: make(map[string]*matchbase.Player)}
+	m.Match = matchbase.NewMatch(app, file, m)
+	return m.Match
+}
+
+func (m *Match) Tick() {
+	m.checkRestPlayer()
 }
 
 func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Message, error) {
-	uid := m.App.GetSessionFromCtx(ctx).UID()
-	if uid == "" {
-		return nil, errors.New("no logged in")
+	player, err := m.ValidatePlayer(
+		ctx,
+		matchbase.WithCheckPlayerNotInMatch(),
+		matchbase.WithAllowCreateNewPlayer(),
+	)
+	if err != nil {
+		return nil, err
 	}
 
-	if player := m.Playermgr.Load(uid); player != nil {
-		return nil, errors.New("player is in match")
-	}
-
-	player := NewPlayer(ctx, uid, m.conf.Matchid, m.conf.InitialChips)
 	if err := m.addPlayer(player); err != nil {
 		return nil, err
 	}
 
-	m.Playermgr.Store(player.Player)
-	return m.NewStartClientAck(player.Player), nil
+	return m.NewStartClientAck(player), nil
 }
 
-func (m *Match) addPlayer(player *Player) error {
+func (m *Match) addPlayer(player *matchbase.Player) error {
 	if m.preTable == nil {
-		m.preTable = NewTable(m)
-		m.tables.Store(m.preTable.ID, m.preTable)
+		m.preTable = NewTable(m.Match)
+		m.AddTable(m.preTable)
 	}
-	if err := m.preTable.AddPlayer(player.Player); err != nil {
+	if err := m.preTable.AddPlayer(player); err != nil {
 		return err
 	}
-	if len(m.preTable.Players) >= int(m.conf.PlayerPerTable) {
+	if len(m.preTable.Players) >= m.Viper.GetInt("player_per_table") {
 		m.preTable = nil
 	}
 	return nil
 }
 
 func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Message, error) {
-	uid := m.App.GetSessionFromCtx(ctx).UID()
-	if uid == "" {
-		return nil, errors.New("no logged in")
+	player, err := m.ValidatePlayer(
+		ctx,
+	)
+	if err != nil {
+		return nil, err
 	}
-	player, ok := m.restPlayers[uid]
+
+	player, ok := m.restPlayers[player.ID]
 	if !ok {
 		return nil, errors.New("player is not in rest")
 	}
@@ -76,19 +78,18 @@ func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Me
 		return nil, err
 	}
 
-	delete(m.restPlayers, uid)
+	delete(m.restPlayers, player.ID)
 	m.addPlayer(player)
-	return m.NewStartClientAck(player.Player), nil
+	return m.NewStartClientAck(player), nil
 }
 
 func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.Message, error) {
-	uid := m.App.GetSessionFromCtx(ctx).UID()
-	if uid == "" {
-		return nil, errors.New("no logged in")
-	}
-	player := m.Playermgr.Load(uid)
-	if player == nil {
-		return nil, errors.New("player is not in match")
+	player, err := m.ValidatePlayer(
+		ctx,
+		matchbase.WithCheckPlayerNotInMatch(),
+	)
+	if err != nil {
+		return nil, err
 	}
 
 	m.exitMatch(player)
@@ -103,11 +104,11 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 	p := player.Sub.(*Player)
 
 	if p.playing {
-		t, ok := m.tables.Load(p.TableId)
-		if !ok {
+		t := m.GetTable(player.TableId)
+		if t == nil {
 			return errors.New("table not found")
 		}
-		return t.(*Table).NetChange(player, req.Online)
+		return t.Sub.(*Table).NetChange(player, req.Online)
 	} else {
 		m.sendRestAck(player)
 	}
@@ -116,13 +117,11 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 
 func (m *Match) HandleGameResult(msg proto.Message) error {
 	req := msg.(*sproto.GameResultReq)
-	table, ok := m.tables.Load(req.Tableid)
-	if !ok {
+	t := m.GetTable(req.Tableid)
+	if t == nil {
 		return errors.New("table not found")
 	}
-
-	t := table.(*Table)
-	err := t.gameResult(req)
+	err := t.Sub.(*Table).gameResult(req)
 	if err != nil {
 		logger.Log.Errorf("Failed to handle game result: %v", err)
 	}
@@ -131,19 +130,18 @@ func (m *Match) HandleGameResult(msg proto.Message) error {
 
 func (m *Match) HandleGameOver(msg proto.Message) error {
 	req := msg.(*sproto.GameOverReq)
-	table, ok := m.tables.Load(req.Tableid)
-	if !ok {
+	table := m.GetTable(req.Tableid)
+	if table == nil {
 		return errors.New("table not found")
 	}
 
-	t := table.(*Table)
-	m.tables.Delete(t.ID)
+	t := table.Sub.(*Table)
 	for _, p := range t.Players {
 		m.sendRestAck(p)
 		p.Sub.(*Player).setMatchState(false)
-		m.restPlayers[p.ID] = p.Sub.(*Player)
+		m.restPlayers[p.ID] = p
 	}
-	m.PutBackTableId(t.ID)
+	m.DelTable(t.ID)
 	return nil
 }
 
@@ -174,12 +172,14 @@ func (m *Match) exitMatch(p *matchbase.Player) {
 		return
 	}
 
-	table, ok := m.tables.Load(p.TableId)
-	if !ok {
-		logger.Log.Errorf("Failed to find table: %v", err)
+	table := m.GetTable(p.TableId)
+	if table == nil {
+		logger.Log.Errorf("table not find")
 		return
 	}
-	if table.(*Table).ExitTable(p) {
+
+	t := table.Sub.(*Table)
+	if t.ExitTable(p) {
 		m.Playermgr.Delete(p.ID)
 	}
 }
@@ -192,8 +192,9 @@ func (m *Match) checkRestPlayer() {
 	}
 	ms := module.(*storage.ETCDMatching)
 	for _, p := range m.restPlayers {
-		if time.Since(p.startTime) > time.Minute*8 {
-			m.sendExitMatchAck(p.Player)
+		player := p.Sub.(*Player)
+		if time.Since(player.startTime) > time.Minute*8 {
+			m.sendExitMatchAck(p)
 			m.Playermgr.Delete(p.ID)
 			if err = ms.Remove(p.ID); err != nil {
 				logger.Log.Errorf("Failed to remove player from etcd: %v", err)
