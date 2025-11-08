@@ -31,7 +31,7 @@ func main() {
 
 	bs := storage.NewETCDMatching(builder.Server, builder.Config.Modules.BindingStorage.Etcd)
 	app.RegisterModule(bs, "matchingstorage")
-	matchbase.Init(app, match.NewMatch, match.NewTable, match.NewPlayer)
+	matchbase.Init(app, match.NewMatch, match.NewPlayer)
 	initServices()
 	logger.Log.Infof("Pitaya server of type %s started", serverType)
 	app.Start()

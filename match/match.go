@@ -3,10 +3,10 @@ package match
 import (
 	"context"
 	"errors"
+	"sync"
 	"time"
 
 	"github.com/kevin-chtw/tw_common/matchbase"
-	"github.com/kevin-chtw/tw_common/storage"
 	"github.com/kevin-chtw/tw_proto/cproto"
 	"github.com/kevin-chtw/tw_proto/sproto"
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
@@ -17,11 +17,11 @@ import (
 type Match struct {
 	*matchbase.Match
 	preTable    *matchbase.Table
-	restPlayers map[string]*matchbase.Player
+	restPlayers sync.Map // string -> *matchbase.Player
 }
 
 func NewMatch(app pitaya.Pitaya, file string) *matchbase.Match {
-	m := &Match{restPlayers: make(map[string]*matchbase.Player)}
+	m := &Match{}
 	m.Match = matchbase.NewMatch(app, file, m)
 	return m.Match
 }
@@ -43,7 +43,7 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 	if err := m.addPlayer(player); err != nil {
 		return nil, err
 	}
-
+	m.AddMatchPlayer(player)
 	return m.NewStartClientAck(player), nil
 }
 
@@ -55,7 +55,7 @@ func (m *Match) addPlayer(player *matchbase.Player) error {
 	if err := m.preTable.AddPlayer(player); err != nil {
 		return err
 	}
-	if len(m.preTable.Players) >= m.Viper.GetInt("player_per_table") {
+	if len(m.preTable.Players) >= int(m.preTable.PlayerCount) {
 		m.preTable = nil
 	}
 	return nil
@@ -69,24 +69,21 @@ func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Me
 		return nil, err
 	}
 
-	player, ok := m.restPlayers[player.ID]
+	playerValue, ok := m.restPlayers.Load(player.ID)
 	if !ok {
 		return nil, errors.New("player is not in rest")
 	}
-
+	player = playerValue.(*matchbase.Player)
 	if err := m.addPlayer(player); err != nil {
 		return nil, err
 	}
-
-	delete(m.restPlayers, player.ID)
-	m.addPlayer(player)
+	m.restPlayers.Delete(player.ID)
 	return m.NewStartClientAck(player), nil
 }
 
 func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.Message, error) {
 	player, err := m.ValidatePlayer(
 		ctx,
-		matchbase.WithCheckPlayerNotInMatch(),
 	)
 	if err != nil {
 		return nil, err
@@ -98,11 +95,13 @@ func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.M
 
 func (m *Match) HandleNetState(msg proto.Message) error {
 	req := msg.(*sproto.NetStateReq)
-	player := m.Playermgr.Load(req.Uid)
+	player := m.GetMatchPlayer(req.Uid)
+	if player == nil {
+		return errors.New("player not found")
+	}
+
 	player.Online = req.Online
-
 	p := player.Sub.(*Player)
-
 	if p.playing {
 		t := m.GetTable(player.TableId)
 		if t == nil {
@@ -139,7 +138,7 @@ func (m *Match) HandleGameOver(msg proto.Message) error {
 	for _, p := range t.Players {
 		m.sendRestAck(p)
 		p.Sub.(*Player).setMatchState(false)
-		m.restPlayers[p.ID] = p
+		m.restPlayers.Store(p.ID, p)
 	}
 	m.DelTable(t.ID)
 	return nil
@@ -156,19 +155,10 @@ func (m *Match) sendRestAck(restPlayer *matchbase.Player) {
 }
 
 func (m *Match) exitMatch(p *matchbase.Player) {
-	module, err := m.App.GetModule("matchingstorage")
-	if err != nil {
-		logger.Log.Errorf(err.Error())
-		return
-	}
-	ms := module.(*storage.ETCDMatching)
-	if err = ms.Remove(p.ID); err != nil {
-		logger.Log.Errorf("Failed to remove player from etcd: %v", err)
-	}
 	p.Exit = true
 	if !p.Sub.(*Player).playing {
-		m.Playermgr.Delete(p.ID)
-		delete(m.restPlayers, p.ID)
+		m.DelMatchPlayer(p.ID)
+		m.restPlayers.Delete(p.ID)
 		return
 	}
 
@@ -180,28 +170,21 @@ func (m *Match) exitMatch(p *matchbase.Player) {
 
 	t := table.Sub.(*Table)
 	if t.ExitTable(p) {
-		m.Playermgr.Delete(p.ID)
+		m.DelMatchPlayer(p.ID)
 	}
 }
 
 func (m *Match) checkRestPlayer() {
-	module, err := m.App.GetModule("matchingstorage")
-	if err != nil {
-		logger.Log.Errorf(err.Error())
-		return
-	}
-	ms := module.(*storage.ETCDMatching)
-	for _, p := range m.restPlayers {
+	m.restPlayers.Range(func(key, value any) bool {
+		p := value.(*matchbase.Player)
 		player := p.Sub.(*Player)
 		if time.Since(player.startTime) > time.Minute*8 {
 			m.sendExitMatchAck(p)
-			m.Playermgr.Delete(p.ID)
-			if err = ms.Remove(p.ID); err != nil {
-				logger.Log.Errorf("Failed to remove player from etcd: %v", err)
-				continue
-			}
+			m.DelMatchPlayer(p.ID)
+			m.restPlayers.Delete(p.ID)
 		}
-	}
+		return true
+	})
 }
 
 func (m *Match) sendExitMatchAck(p *matchbase.Player) {

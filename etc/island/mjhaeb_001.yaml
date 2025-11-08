@@ -1,9 +1,8 @@
-setting:
-  game_type: mjhaeb
-  matchid: 100101001
-  name: 新手场
-  player_per_table: 4
-  sign_condition: ""
-  initial_chips: 0
-  score_base: 1
-  property: 10,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+game_type: mjhaeb
+matchid: 100101001
+name: 新手场
+player_per_table: 4
+sign_condition: ""
+initial_chips: 0
+score_base: 1
+property: 10,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0
