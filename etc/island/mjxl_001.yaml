@@ -1,0 +1,8 @@
+game_type: mjxl
+matchid: 100301001
+name: 新手场
+player_per_table: 4
+sign_condition: ""
+initial_chips: 1000
+score_base: 10
+property: 10,8,0,1,10,0,1,1,1,1,1,1,1,1,1,1
