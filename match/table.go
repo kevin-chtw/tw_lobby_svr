@@ -12,7 +12,7 @@ type Table struct {
 func NewTable(m *matchbase.Match) *matchbase.Table {
 	t := &Table{}
 	t.Table = matchbase.NewTable(m, t)
-	t.SendAddTableReq(1, nil)
+	t.SendAddTableReq(1, "", nil)
 	return t.Table
 }
 
