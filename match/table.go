@@ -1,12 +1,15 @@
 package match
 
 import (
+	"time"
+
 	"github.com/kevin-chtw/tw_common/matchbase"
 	"github.com/kevin-chtw/tw_proto/sproto"
 )
 
 type Table struct {
 	*matchbase.Table
+	lastMatched time.Time
 }
 
 func NewTable(m *matchbase.Match) *matchbase.Table {
@@ -29,4 +32,19 @@ func (t *Table) ExitTable(player *matchbase.Player) bool {
 		return false
 	}
 	return true
+}
+
+func (t *Table) addPlayer(player *matchbase.Player) error {
+	if err := t.Table.AddPlayer(player); err != nil {
+		return err
+	}
+	t.lastMatched = time.Now()
+	return nil
+}
+
+func (t *Table) needBot() bool {
+	if !t.Match.Viper.GetBool("allow_bots") {
+		return false
+	}
+	return time.Since(t.lastMatched) > 10*time.Second && len(t.Players) < int(t.PlayerCount)
 }

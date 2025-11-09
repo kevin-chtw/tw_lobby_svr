@@ -5,4 +5,5 @@ player_per_table: 4
 sign_condition: ""
 initial_chips: 0
 score_base: 1
+allow_bots: true
 property: 10,10,0,0,0,0,0,0,0,0,0,0,0,0,0,0

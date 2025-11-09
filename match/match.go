@@ -12,11 +12,12 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/logger"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Match struct {
 	*matchbase.Match
-	preTable    *matchbase.Table
+	preTable    *Table
 	restPlayers sync.Map // string -> *matchbase.Player
 }
 
@@ -28,6 +29,7 @@ func NewMatch(app pitaya.Pitaya, file string) *matchbase.Match {
 
 func (m *Match) Tick() {
 	m.checkRestPlayer()
+	m.checkPreTableTimeout()
 }
 
 func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Message, error) {
@@ -49,10 +51,10 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 
 func (m *Match) addPlayer(player *matchbase.Player) error {
 	if m.preTable == nil {
-		m.preTable = NewTable(m.Match)
-		m.AddTable(m.preTable)
+		m.preTable = NewTable(m.Match).Sub.(*Table)
+		m.AddTable(m.preTable.Table)
 	}
-	if err := m.preTable.AddPlayer(player); err != nil {
+	if err := m.preTable.addPlayer(player); err != nil {
 		return err
 	}
 	if len(m.preTable.Players) >= int(m.preTable.PlayerCount) {
@@ -108,8 +110,9 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 			return errors.New("table not found")
 		}
 		return t.Sub.(*Table).NetChange(player, req.Online)
-	} else {
-		m.sendRestAck(player)
+	} else if req.Online {
+		m.exitMatch(player)
+		m.sendExitMatchAck(player)
 	}
 	return nil
 }
@@ -145,6 +148,9 @@ func (m *Match) HandleGameOver(msg proto.Message) error {
 }
 
 func (m *Match) sendRestAck(restPlayer *matchbase.Player) {
+	if restPlayer.Bot {
+		return
+	}
 	rest := &cproto.RestAck{}
 	data, err := m.NewMatchAck(restPlayer.Ctx, rest)
 	if err != nil {
@@ -185,6 +191,75 @@ func (m *Match) checkRestPlayer() {
 		}
 		return true
 	})
+}
+
+func (m *Match) checkPreTableTimeout() {
+	if m.preTable == nil {
+		return
+	}
+
+	// 检查preTable是否已经存在超过1分钟且玩家数量不足
+	if m.preTable.needBot() {
+		m.requestBotForPreTable()
+	}
+}
+func (m *Match) requestBotForPreTable() {
+	var availablePlayer *matchbase.Player
+	m.restPlayers.Range(func(key, value any) bool {
+		p := value.(*matchbase.Player)
+		player := p.Sub.(*Player)
+		if player.Bot && time.Now().Unix() < player.expired {
+			availablePlayer = p
+			return false
+		}
+		return true
+	})
+
+	if availablePlayer != nil {
+		if err := m.addPlayer(availablePlayer); err != nil {
+			logger.Log.Errorf("Failed to add player from rest to preTable: %v", err)
+		} else {
+			logger.Log.Infof("Player %s from rest added to preTable", availablePlayer.ID)
+			m.restPlayers.Delete(availablePlayer.ID)
+			return
+		}
+	}
+
+	msg := m.sendAcountReq(true, &sproto.GetBotReq{})
+	if msg == nil {
+		return
+	}
+
+	ack, err := msg.Ack.UnmarshalNew()
+	if err != nil {
+		logger.Log.Errorf("Failed to unmarshal account ack: %v", err)
+		return
+	}
+	botAck := ack.(*sproto.GetBotAck)
+	player := NewPlayer(context.Background(), botAck.Uid, m.Viper.GetInt32("matchid"), m.Viper.GetInt64("initial_chips"))
+	player.Sub.(*Player).setBotInfo(botAck)
+	if err := m.addPlayer(player); err != nil {
+		logger.Log.Errorf("Failed to add player from rest to preTable: %v", err)
+	}
+}
+
+func (m *Match) sendAcountReq(bot bool, msg proto.Message) *sproto.AccountAck {
+	data, err := anypb.New(msg)
+	if err != nil {
+		logger.Log.Errorf("failed to create anypb: %v", err)
+		return nil
+	}
+
+	req := &sproto.AccountReq{
+		Bot: bot,
+		Req: data,
+	}
+	ack := &sproto.AccountAck{}
+	if err = m.App.RPC(context.Background(), "account.remote.message", ack, req); err != nil {
+		logger.Log.Errorf("failed to request: %v", err)
+		return nil
+	}
+	return ack
 }
 
 func (m *Match) sendExitMatchAck(p *matchbase.Player) {
