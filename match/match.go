@@ -51,7 +51,11 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 
 func (m *Match) addPlayer(player *matchbase.Player) error {
 	if m.preTable == nil {
-		m.preTable = NewTable(m.Match).Sub.(*Table)
+		table, err := NewTable(m.Match)
+		if err != nil {
+			return err
+		}
+		m.preTable = table.Sub.(*Table)
 		m.AddTable(m.preTable.Table)
 	}
 	if err := m.preTable.addPlayer(player); err != nil {
@@ -105,15 +109,18 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 	player.Online = req.Online
 	p := player.Sub.(*Player)
 	if p.playing {
+		// 玩家在游戏中，转发给游戏服处理断线/重连
 		t := m.GetTable(player.TableId)
 		if t == nil {
 			return errors.New("table not found")
 		}
 		return t.Sub.(*Table).NetChange(player, req.Online)
 	} else if req.Online {
-		m.exitMatch(player)
-		m.sendExitMatchAck(player)
+		// 玩家在休息区重连，重发 RestAck 提示可以继续游戏
+		// 不要强制退出，让玩家可以选择 Continue 或自己点 Exit
+		m.sendRestAck(player)
 	}
+	// 离线状态下不做处理，等待超时自动清理（checkRestPlayer）
 	return nil
 }
 

@@ -12,11 +12,15 @@ type Table struct {
 	lastMatched time.Time
 }
 
-func NewTable(m *matchbase.Match) *matchbase.Table {
+func NewTable(m *matchbase.Match) (*matchbase.Table, error) {
 	t := &Table{}
 	t.Table = matchbase.NewTable(m, t)
-	t.SendAddTableReq(1, "", nil)
-	return t.Table
+	if err := t.SendAddTableReq(1, "", nil); err != nil {
+		// 创建桌子失败，回收 table ID 并返回错误
+		m.PutBackTableId(t.ID)
+		return nil, err
+	}
+	return t.Table, nil
 }
 
 func (t *Table) gameResult(msg *sproto.GameResultReq) error {
@@ -27,10 +31,11 @@ func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 }
 
 func (t *Table) ExitTable(player *matchbase.Player) bool {
-	delete(t.Players, player.ID)
+	// 先向游戏服发送退出请求，成功后再删除本地状态，避免状态不一致
 	if err := t.SendExitTableReq(player); err != nil {
 		return false
 	}
+	delete(t.Players, player.ID)
 	return true
 }
 
@@ -46,5 +51,5 @@ func (t *Table) needBot() bool {
 	if !t.Match.Viper.GetBool("allow_bots") {
 		return false
 	}
-	return time.Since(t.lastMatched) > 10*time.Second && len(t.Players) < int(t.PlayerCount)
+	return time.Since(t.lastMatched) > 3*time.Second && len(t.Players) < int(t.PlayerCount)
 }
