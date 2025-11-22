@@ -32,6 +32,7 @@ func (p *Player) Init() {
 	p.handlers[utils.TypeUrl(&cproto.SignupReq{})] = (*match.Match).HandleSignup
 	p.handlers[utils.TypeUrl(&cproto.ContinueReq{})] = (*match.Match).HandleContinue
 	p.handlers[utils.TypeUrl(&cproto.ExitMatchReq{})] = (*match.Match).HandleExitMatch
+	p.handlers[utils.TypeUrl(&cproto.SwitchTableReq{})] = (*match.Match).HandleSwitchTable
 }
 
 func (p *Player) Message(ctx context.Context, data []byte) ([]byte, error) {

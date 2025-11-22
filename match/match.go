@@ -87,15 +87,30 @@ func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Me
 	return m.NewStartClientAck(player), nil
 }
 
-func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.Message, error) {
-	player, err := m.ValidatePlayer(
-		ctx,
-	)
+func (m *Match) HandleSwitchTable(ctx context.Context, msg proto.Message) (proto.Message, error) {
+	player, err := m.ValidatePlayer(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	m.exitMatch(player)
+	if err = m.exitMatch(player); err != nil {
+		return nil, err
+	}
+	if err := m.addPlayer(player); err != nil {
+		return nil, err
+	}
+	return m.NewStartClientAck(player), nil
+}
+
+func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.Message, error) {
+	player, err := m.ValidatePlayer(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if err = m.exitMatch(player); err != nil {
+		player.Exit = true //按强退处理，只是不能再报名当前比赛
+	}
 	return &cproto.ExitMatchAck{}, nil
 }
 
@@ -169,25 +184,25 @@ func (m *Match) sendRestAck(restPlayer *matchbase.Player) {
 	m.App.SendPushToUsers(m.App.GetServer().Type, data, []string{restPlayer.ID}, "proxy")
 }
 
-func (m *Match) exitMatch(p *matchbase.Player) {
+func (m *Match) exitMatch(p *matchbase.Player) error {
 	if !p.Sub.(*Player).playing {
 		m.DelMatchPlayer(p.ID)
 		m.restPlayers.Delete(p.ID)
-		return
+		return nil
 	}
 
 	table := m.GetTable(p.TableId)
 	if table == nil {
 		logger.Log.Errorf("table not find")
-		return
+		return nil
 	}
 
 	t := table.Sub.(*Table)
-	if t.ExitTable(p) {
-		m.DelMatchPlayer(p.ID)
-	} else {
-		p.Exit = true
+	if !t.ExitTable(p) {
+		return errors.New("player is playing")
 	}
+	m.DelMatchPlayer(p.ID)
+	return nil
 }
 
 func (m *Match) checkRestPlayer() {
