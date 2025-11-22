@@ -32,9 +32,9 @@ func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 	return nil
 }
 
-func (t *Table) ExitTable(player *matchbase.Player) bool {
+func (t *Table) ExitTable(player *matchbase.Player, fause bool) bool {
 	// 先向游戏服发送退出请求，成功后再删除本地状态，避免状态不一致
-	if err := t.SendExitTableReq(player); err != nil {
+	if err := t.SendExitTableReq(player, fause); err != nil {
 		return false
 	}
 	delete(t.Players, player.ID)

@@ -93,7 +93,7 @@ func (m *Match) HandleSwitchTable(ctx context.Context, msg proto.Message) (proto
 		return nil, err
 	}
 
-	if err = m.exitMatch(player); err != nil {
+	if err = m.exitMatch(player, false); err != nil {
 		return nil, err
 	}
 	if err := m.addPlayer(player); err != nil {
@@ -108,7 +108,7 @@ func (m *Match) HandleExitMatch(ctx context.Context, msg proto.Message) (proto.M
 		return nil, err
 	}
 
-	if err = m.exitMatch(player); err != nil {
+	if err = m.exitMatch(player, true); err != nil {
 		player.Exit = true //按强退处理，只是不能再报名当前比赛
 	}
 	return &cproto.ExitMatchAck{}, nil
@@ -184,7 +184,7 @@ func (m *Match) sendRestAck(restPlayer *matchbase.Player) {
 	m.App.SendPushToUsers(m.App.GetServer().Type, data, []string{restPlayer.ID}, "proxy")
 }
 
-func (m *Match) exitMatch(p *matchbase.Player) error {
+func (m *Match) exitMatch(p *matchbase.Player, fause bool) error {
 	if !p.Sub.(*Player).playing {
 		m.DelMatchPlayer(p.ID)
 		m.restPlayers.Delete(p.ID)
@@ -198,7 +198,7 @@ func (m *Match) exitMatch(p *matchbase.Player) error {
 	}
 
 	t := table.Sub.(*Table)
-	if !t.ExitTable(p) {
+	if !t.ExitTable(p, fause) {
 		return errors.New("player is playing")
 	}
 	m.DelMatchPlayer(p.ID)
