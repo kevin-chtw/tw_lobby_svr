@@ -3,6 +3,7 @@ package match
 import (
 	"context"
 	"errors"
+	"math/rand"
 	"sync"
 	"time"
 
@@ -12,7 +13,6 @@ import (
 	pitaya "github.com/topfreegames/pitaya/v3/pkg"
 	"github.com/topfreegames/pitaya/v3/pkg/logger"
 	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/anypb"
 )
 
 type Match struct {
@@ -40,6 +40,25 @@ func (m *Match) HandleSignup(ctx context.Context, msg proto.Message) (proto.Mess
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	playerInfo, err := m.PlayerInfoReq(ctx, false, player.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 先验证报名条件
+	if err := m.CheckSignCondition(playerInfo); err != nil {
+		player.Score += 3000
+		m.ChangeCoinReq(ctx, false, player.ID, 3000)
+		//TODO 暂时直接加分
+	}
+	if player.Score == -1 {
+		player.Score = playerInfo.Coin
+		_, err := m.ChangeCoinReq(ctx, false, player.ID, -playerInfo.Coin)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if err := m.addPlayer(player); err != nil {
@@ -80,6 +99,13 @@ func (m *Match) HandleContinue(ctx context.Context, msg proto.Message) (proto.Me
 		return nil, errors.New("player is not in rest")
 	}
 	player = playerValue.(*matchbase.Player)
+	if m.Viper.GetInt64("low_coin") > 0 && player.Score < m.Viper.GetInt64("low_coin") {
+		return nil, errors.New("player coin is not enough")
+	}
+	if m.Viper.GetInt64("high_coin") > 0 && player.Score > m.Viper.GetInt64("high_coin") {
+		return nil, errors.New("player coin is enough")
+	}
+
 	if err := m.addPlayer(player); err != nil {
 		return nil, err
 	}
@@ -202,6 +228,9 @@ func (m *Match) exitMatch(p *matchbase.Player, fause bool) error {
 		return errors.New("player is playing")
 	}
 	m.DelMatchPlayer(p.ID)
+	if m.Viper.GetInt64("initial_chips") == -1 {
+		m.ChangeCoinReq(p.Ctx, p.Bot, p.ID, p.Score)
+	}
 	return nil
 }
 
@@ -250,41 +279,20 @@ func (m *Match) requestBotForPreTable() {
 		}
 	}
 
-	msg := m.sendAcountReq(true, &sproto.GetBotReq{})
-	if msg == nil {
-		return
-	}
-
-	ack, err := msg.Ack.UnmarshalNew()
+	botAck, err := m.GetBotReq(context.Background(), true, &sproto.GetBotReq{})
 	if err != nil {
 		logger.Log.Errorf("Failed to unmarshal account ack: %v", err)
 		return
 	}
-	botAck := ack.(*sproto.GetBotAck)
+
 	player := NewPlayer(context.Background(), botAck.Uid, m.Viper.GetInt32("matchid"), m.Viper.GetInt64("initial_chips"))
+	if player.Score == -1 {
+		player.Score = m.Viper.GetInt64("low_coin") + (rand.Int63n(m.Viper.GetInt64("high_coin")-m.Viper.GetInt64("low_coin"))/10)*10
+	}
 	player.Sub.(*Player).setBotInfo(botAck)
 	if err := m.addPlayer(player); err != nil {
 		logger.Log.Errorf("Failed to add player from rest to preTable: %v", err)
 	}
-}
-
-func (m *Match) sendAcountReq(bot bool, msg proto.Message) *sproto.AccountAck {
-	data, err := anypb.New(msg)
-	if err != nil {
-		logger.Log.Errorf("failed to create anypb: %v", err)
-		return nil
-	}
-
-	req := &sproto.AccountReq{
-		Bot: bot,
-		Req: data,
-	}
-	ack := &sproto.AccountAck{}
-	if err = m.App.RPC(context.Background(), "account.remote.message", ack, req); err != nil {
-		logger.Log.Errorf("failed to request: %v", err)
-		return nil
-	}
-	return ack
 }
 
 func (m *Match) sendExitMatchAck(p *matchbase.Player) {

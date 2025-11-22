@@ -1,0 +1,11 @@
+game_type: mjsc
+matchid: 100201002
+name: 2000场
+player_per_table: 4
+sign_condition: '[{"coin_lower":2000}]'
+initial_chips: -1
+low_coin: 1000
+high_coin: 10000
+score_base: 10
+allow_bots: true
+property: 10,8,0,1,10,0,1,1,1,1,1,1,1,1,1,1
