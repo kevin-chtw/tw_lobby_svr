@@ -25,7 +25,9 @@ func NewTable(m *matchbase.Match) (*matchbase.Table, error) {
 
 func (t *Table) gameResult(msg *sproto.GameResultReq) error {
 	for p, s := range msg.Scores {
-		t.Players[p].Score = s
+		if player, ok := t.Players[p]; ok {
+			player.Score = s
+		}
 	}
 	return nil
 }

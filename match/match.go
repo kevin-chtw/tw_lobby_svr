@@ -105,7 +105,9 @@ func (m *Match) HandleNetState(msg proto.Message) error {
 	if player == nil {
 		return errors.New("player not found")
 	}
-
+	if player.Exit {
+		return nil
+	}
 	player.Online = req.Online
 	p := player.Sub.(*Player)
 	if p.playing {
@@ -168,7 +170,6 @@ func (m *Match) sendRestAck(restPlayer *matchbase.Player) {
 }
 
 func (m *Match) exitMatch(p *matchbase.Player) {
-	p.Exit = true
 	if !p.Sub.(*Player).playing {
 		m.DelMatchPlayer(p.ID)
 		m.restPlayers.Delete(p.ID)
@@ -184,6 +185,8 @@ func (m *Match) exitMatch(p *matchbase.Player) {
 	t := table.Sub.(*Table)
 	if t.ExitTable(p) {
 		m.DelMatchPlayer(p.ID)
+	} else {
+		p.Exit = true
 	}
 }
 
